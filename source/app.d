@@ -11,7 +11,37 @@ import std.string;
 
 string destDirRoot;
 bool infoMode;
+bool copyFile;
+bool testMode;
 string dirFormat="yyyy/yyyymm";
+string extFilter="jpg";
+
+bool ContentEqual(string path1, string path2)
+{
+	return
+		isFile(path1) && 
+		isFile(path2) &&
+		getSize(path1) == getSize(path2) &&
+		read(path1) == read(path2);
+}
+
+unittest
+{
+	auto f1 = File("deleteme.1", "w");
+	f1.write("hello");
+	f1.close();
+	auto f2 = File("deleteme.2", "w");
+	f2.write("hello");
+	f2.close();
+	auto f3 = File("deleteme.3", "w");
+	f3.write("hell0");
+	f3.close();
+	assert(ContentEqual("deleteme.1", "deleteme.2"));
+	assert(!ContentEqual("deleteme.1", "deleteme.3"));
+	std.file.remove("deleteme.1");
+	std.file.remove("deleteme.2");
+	std.file.remove("deleteme.3");
+}
 
 bool GetPhotoTakenTime(string path, DateTime* dt)
 {	
@@ -98,18 +128,30 @@ void ProcessSingleFile(string path)
 		return;
 	}
 
+	if (extension(path).toLower() != "."~extFilter.toLower())
+	{
+		return;
+	}
+
 	DateTime dt;
-	GetPhotoTakenTime(path, &dt);
-	string year = to!string(dt.year);
-	string month = format("%02d", to!int(dt.month));
-	string day = format("%02d", dt.day);
-	string subdir = dirFormat.replace("yyyy", year).replace("mm", month).replace("dd", day);
+	string subdir = "unsort";
+	if (GetPhotoTakenTime(path, &dt))
+	{
+		string year = to!string(dt.year);
+		string month = format("%02d", to!int(dt.month));
+		string day = format("%02d", dt.day);
+		subdir = dirFormat.replace("yyyy", year).replace("mm", month).replace("dd", day);
+	}
+
 	string destDir = buildNormalizedPath(destDirRoot, subdir);
 	string destPath = buildPath(destDir, baseName(path));
 
 	// if 'destPath' already exists, we must find a new name
 	if (exists(destPath))
 	{
+		if (ContentEqual(path, destPath))
+			return;
+
 		string base = baseName(stripExtension(path));
 		string ext = extension(path);
 		for (int x = 2; ; x++)
@@ -122,8 +164,19 @@ void ProcessSingleFile(string path)
 		}
 	}
 
-	mkdirRecurse(destDir);
-	rename(path, destPath);
+	if (!testMode)
+	{
+		mkdirRecurse(destDir);
+		if (copyFile)
+		{
+			copy(path, destPath);
+		}
+		else
+		{
+			rename(path, destPath);
+		}
+	}
+
 	writeln("-> ", destPath);
 }
 
@@ -132,8 +185,11 @@ void main(string[] argv)
 	auto helpInformation = getopt(
 		argv, 
 		"dest|D", "Set destination path", &destDirRoot,
-		"dirformat|f", "Directory format, default to 'yyyy/yyyymm'", &dirFormat
 		"info", "Info mode: only output file information", &infoMode,
+		"dirformat|f", "Directory format, default to 'yyyy/yyyymm'", &dirFormat,
+		"copy", "Copy file instread of move", &copyFile,
+		"ext", "File extension", &extFilter,
+		"test", "Test mode, do not perform file operation, just print", &testMode
 		);
 	if (helpInformation.helpWanted)
 	{
