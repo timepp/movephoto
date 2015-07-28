@@ -1,0 +1,11 @@
+.dub
+docs.json
+__dummy.html
+*.o
+*.obj
+*.visualdproj
+*.suo
+*.sln
+movephoto.exe
+movephoto_d.exe
+dub.selections.json

@@ -1,0 +1,9 @@
+{
+	"name": "movephoto",
+	"description": "A minimal D application.",
+	"copyright": "Copyright (C) 2015, idtong",
+	"authors": ["idtong"],
+	"dependencies": {
+        "derelict-fi": "~>2.0.2"
+	}
+}
