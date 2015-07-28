@@ -10,7 +10,7 @@ import std.format;
 import std.string;
 
 string destDirRoot;
-bool debugMode;
+bool infoMode;
 string dirFormat="yyyy/yyyymm";
 
 bool GetPhotoTakenTime(string path, DateTime* dt)
@@ -92,7 +92,7 @@ void ProcessSingleFile(string path)
 {
 	writeln(path);
 
-	if (debugMode)
+	if (infoMode)
 	{
 		OutputFileInfo(path);
 		return;
@@ -132,8 +132,8 @@ void main(string[] argv)
 	auto helpInformation = getopt(
 		argv, 
 		"dest|D", "Set destination path", &destDirRoot,
-		"debug", "Debug mode: only output file information", &debugMode,
 		"dirformat|f", "Directory format, default to 'yyyy/yyyymm'", &dirFormat
+		"info", "Info mode: only output file information", &infoMode,
 		);
 	if (helpInformation.helpWanted)
 	{
