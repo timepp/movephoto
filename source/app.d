@@ -8,6 +8,7 @@ import std.path;
 import std.datetime;
 import std.format;
 import std.string;
+import std.traits;
 
 string destDirRoot;
 bool infoMode;
@@ -79,8 +80,9 @@ bool GetPhotoTakenTime(string path, DateTime* dt)
 	return true;
 }
 
-void OutputMetadataByCategory(FIBITMAP* f, FREE_IMAGE_MDMODEL model)
+void OutputMetadataByCategory(FIBITMAP* f, FREE_IMAGE_MDMODEL model, string modelName)
 {
+	writefln("%s------------------------------------------", modelName);
 	FITAG* tag;
 	auto handle = FreeImage_FindFirstMetadata(model, f, &tag); 
 	if(handle) { 
@@ -91,14 +93,51 @@ void OutputMetadataByCategory(FIBITMAP* f, FREE_IMAGE_MDMODEL model)
 			auto kvv = FreeImage_GetTagValue(tag);
 			switch (kt)
 			{
-				case FIDT_ASCII:
-					const(char)* kc = cast(const(char)*)kvv;
-					kv = to!string(kc);
+				case FIDT_BYTE:
+					kv = to!string(*cast(const(ubyte)*)kvv);
 					break;
+				case FIDT_ASCII:
+				case FIDT_UNDEFINED:
+					kv = to!string(cast(const(char)*)kvv);
+					break;
+				case FIDT_SHORT:
+					kv = to!string(*cast(const(ushort)*)kvv);
+					break;
+				case FIDT_LONG:
+					kv = to!string(*cast(const(uint)*)kvv);
+					break;
+				case FIDT_RATIONAL:
+					auto ki = cast(const(uint)*)kvv;
+					kv = to!string(ki[0]) ~ "/" ~ to!string(ki[1]);
+					break;
+				case FIDT_SBYTE:
+					kv = to!string(*cast(const(byte)*)kvv);
+					break;
+				case FIDT_SSHORT:
+					kv = to!string(*cast(const(short)*)kvv);
+					break;
+				case FIDT_SLONG:
+				case FIDT_IFD:
+					kv = to!string(*cast(const(int)*)kvv);
+					break;
+				case FIDT_SRATIONAL:
+					auto ki = cast(const(int)*)kvv;
+					kv = to!string(ki[0]) ~ "/" ~ to!string(ki[1]);
+					break;
+				case FIDT_FLOAT:
+					kv = to!string(*cast(const(float)*)kvv);
+					break;
+				case FIDT_DOUBLE:
+					kv = to!string(*cast(const(double)*)kvv);
+					break;
+				case FIDT_PALETTE:
+					kv = to!string(*cast(const(uint)*)kvv);
+					break;
+
 				default:
 					break;
 			}
-			writefln("  %s:%s", kn, kv);
+			writefln("  %s: %s", kn, kv);
 		} while(FreeImage_FindNextMetadata(handle, &tag)); 
 		FreeImage_FindCloseMetadata(handle); 
 	} 	
@@ -110,12 +149,18 @@ void OutputFileInfo(string path)
 	FIBITMAP* f = FreeImage_LoadU(FIF_JPEG, u);
 	scope(exit) FreeImage_Unload(f);
 
-	for (int x = 0; x < 12; x++)
-	{
-		writeln("  ", x, "------------------------------------------");
-		OutputMetadataByCategory(f, to!FREE_IMAGE_MDMODEL(x));
-	}
-
+	OutputMetadataByCategory(f, FIMD_COMMENTS, "Comments");
+	OutputMetadataByCategory(f, FIMD_EXIF_MAIN, "EXIF.main");
+	OutputMetadataByCategory(f, FIMD_EXIF_EXIF, "EXIF.exif");
+	OutputMetadataByCategory(f, FIMD_EXIF_GPS, "EXIF.GPS");
+	OutputMetadataByCategory(f, FIMD_EXIF_MAKERNOTE, "EXIF.maker note");
+	OutputMetadataByCategory(f, FIMD_EXIF_INTEROP, "EXIF.inter operation");
+	OutputMetadataByCategory(f, FIMD_EXIF_RAW, "EXIF.raw");
+	OutputMetadataByCategory(f, FIMD_IPTC, "IPTC");
+	OutputMetadataByCategory(f, FIMD_XMP, "XMP");
+	OutputMetadataByCategory(f, FIMD_GEOTIFF, "GEOTIFF");
+	OutputMetadataByCategory(f, FIMD_ANIMATION, "Animation");
+	OutputMetadataByCategory(f, FIMD_CUSTOM, "Custom");
 }
 
 void ProcessSingleFile(string path)
@@ -197,7 +242,7 @@ void main(string[] argv)
 		return;
 	}
 
-	if (destDirRoot == "")
+	if (destDirRoot == "" && !infoMode)
 	{
 		writeln("Please give destination path");
 		return;
