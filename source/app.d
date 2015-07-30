@@ -9,11 +9,15 @@ import std.datetime;
 import std.format;
 import std.string;
 import std.exception;
+import std.regex;
+import std.process;
 
 string destDirRoot;
 bool infoMode;
 bool copyFile;
 bool testMode;
+bool videoMode;
+bool renameFile;
 string dirFormat="yyyy/yyyymm";
 
 bool ContentEqual(string path1, string path2)
@@ -43,6 +47,23 @@ unittest
 	std.file.remove("deleteme.3");
 }
 
+bool parseStandardTimeString(string vs, DateTime* dt)
+{
+	if (vs.length < 19)
+	{
+		return false;
+	}
+
+	dt.year = to!int(vs[0..4]);
+	dt.month = to!Month(to!int(vs[5..7]));
+	dt.day = to!int(vs[8..10]);
+	dt.hour = to!int(vs[11..13]);
+	dt.minute = to!int(vs[14..16]);
+	dt.second = to!int(vs[17..19]);
+
+	return true;
+}
+
 bool GetPhotoTakenTime(string path, DateTime* dt)
 {	
 	FITAG* tag;
@@ -65,18 +86,26 @@ bool GetPhotoTakenTime(string path, DateTime* dt)
 	const(void)* v = FreeImage_GetTagValue(tag);
 	const(char)* vc = cast(const(char)*)v;
 	string vs = to!string(vc);
-	if (vs.length < 19)
+
+	return parseStandardTimeString(vs, dt);
+}
+
+bool GetVideoTakenTime(string path, DateTime* dt)
+{
+	auto probe = execute(["ffprobe", "-hide_banner", path]);
+	enforce(probe.status == 0, "not a video file");
+
+	auto ctr = ctRegex!(`\s*creation_time\s+:\s+(\S+)\s+(\S+)`);
+	auto r = matchFirst(probe.output, ctr);
+
+	string vs = r[1] ~ " " ~ r[2];
+	if (parseStandardTimeString(vs, dt))
 	{
-		return false;
+		*dt = *dt + hours(8);
+		return true;
 	}
 
-	dt.year = to!int(vs[0..4]);
-	dt.month = to!Month(to!int(vs[5..7]));
-	dt.day = to!int(vs[8..10]);
-	dt.hour = to!int(vs[11..13]);
-	dt.minute = to!int(vs[14..16]);
-	dt.second = to!int(vs[17..19]);
-	return true;
+	return false;
 }
 
 void OutputMetadataByCategory(FIBITMAP* f, FREE_IMAGE_MDMODEL model, string modelName)
@@ -142,7 +171,7 @@ void OutputMetadataByCategory(FIBITMAP* f, FREE_IMAGE_MDMODEL model, string mode
 	} 	
 }
 
-void OutputFileInfo(string path)
+void OutputJPEGFileInfo(string path)
 {
 	auto u = path.toUTF16z();
 	FIBITMAP* f = enforce(FreeImage_LoadU(FIF_JPEG, u), "not a JPEG image");
@@ -162,6 +191,37 @@ void OutputFileInfo(string path)
 	OutputMetadataByCategory(f, FIMD_CUSTOM, "Custom");
 }
 
+void OutputVideoFileInfo(string path)
+{
+	auto probe = execute(["ffprobe", "-hide_banner", path]);
+	enforce(probe.status == 0, "not a video file");
+	writeln(probe.output);
+}
+
+void OutputFileInfo(string path)
+{
+	if (videoMode)
+	{
+		OutputVideoFileInfo(path);
+	}
+	else
+	{
+		OutputJPEGFileInfo(path);
+	}
+}
+
+bool GetTakenTime(string path, DateTime* dt)
+{
+	if (videoMode)
+	{
+		return GetVideoTakenTime(path, dt);
+	}
+	else
+	{
+		return GetPhotoTakenTime(path, dt);
+	}
+}
+
 void ProcessSingleFile(string path)
 {
 	writeln(path);
@@ -174,7 +234,7 @@ void ProcessSingleFile(string path)
 
 	DateTime dt;
 	string subdir = "unsort";
-	if (GetPhotoTakenTime(path, &dt))
+	if (GetTakenTime(path, &dt))
 	{
 		string year = to!string(dt.year);
 		string month = format("%02d", to!int(dt.month));
@@ -183,7 +243,15 @@ void ProcessSingleFile(string path)
 	}
 
 	string destDir = buildNormalizedPath(destDirRoot, subdir);
-	string destPath = buildPath(destDir, baseName(path));
+	string base = baseName(stripExtension(path));
+	string ext = extension(path);
+
+	if (renameFile)
+	{
+		base = dt.date.toISOString() ~ "_" ~ dt.timeOfDay.toISOString();
+	}
+
+	string destPath = buildNormalizedPath(destDir, base ~ ext);
 
 	// if 'destPath' already exists, we must find a new name
 	if (exists(destPath))
@@ -191,11 +259,9 @@ void ProcessSingleFile(string path)
 		if (ContentEqual(path, destPath))
 			return;
 
-		string base = baseName(stripExtension(path));
-		string ext = extension(path);
 		for (int x = 2; ; x++)
 		{
-			destPath = buildPath(destDir, format("%s %d%s", base, x, ext));
+			destPath = buildNormalizedPath(destDir, format("%s %d%s", base, x, ext));
 			if (!exists(destPath))
 			{
 				break;
@@ -227,6 +293,8 @@ void main(string[] argv)
 		"info", "Info mode: only output file information", &infoMode,
 		"dirformat|f", "Directory format, default to 'yyyy/yyyymm'", &dirFormat,
 		"copy", "Copy file instread of move", &copyFile,
+		"video", "Process video files", &videoMode,
+		"rename", "Rename file to yyyymmdd_HHMMSS", &renameFile,
 		"test", "Test mode, do not perform file operation, just print", &testMode
 		);
 	if (helpInformation.helpWanted)
