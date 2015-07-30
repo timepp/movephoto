@@ -8,14 +8,13 @@ import std.path;
 import std.datetime;
 import std.format;
 import std.string;
-import std.traits;
+import std.exception;
 
 string destDirRoot;
 bool infoMode;
 bool copyFile;
 bool testMode;
 string dirFormat="yyyy/yyyymm";
-string extFilter="jpg";
 
 bool ContentEqual(string path1, string path2)
 {
@@ -48,7 +47,7 @@ bool GetPhotoTakenTime(string path, DateTime* dt)
 {	
 	FITAG* tag;
 	auto u = path.toUTF16z();
-	auto f = FreeImage_LoadU(FIF_JPEG, u);
+	auto f = enforce(FreeImage_LoadU(FIF_JPEG, u), "not a JPEG image");
 	scope(exit) FreeImage_Unload(f);
 
 	if (!FreeImage_GetMetadata(FIMD_EXIF_EXIF, f, "DateTimeOriginal", &tag))
@@ -146,7 +145,7 @@ void OutputMetadataByCategory(FIBITMAP* f, FREE_IMAGE_MDMODEL model, string mode
 void OutputFileInfo(string path)
 {
 	auto u = path.toUTF16z();
-	FIBITMAP* f = FreeImage_LoadU(FIF_JPEG, u);
+	FIBITMAP* f = enforce(FreeImage_LoadU(FIF_JPEG, u), "not a JPEG image");
 	scope(exit) FreeImage_Unload(f);
 
 	OutputMetadataByCategory(f, FIMD_COMMENTS, "Comments");
@@ -170,11 +169,6 @@ void ProcessSingleFile(string path)
 	if (infoMode)
 	{
 		OutputFileInfo(path);
-		return;
-	}
-
-	if (extension(path).toLower() != "."~extFilter.toLower())
-	{
 		return;
 	}
 
@@ -233,7 +227,6 @@ void main(string[] argv)
 		"info", "Info mode: only output file information", &infoMode,
 		"dirformat|f", "Directory format, default to 'yyyy/yyyymm'", &dirFormat,
 		"copy", "Copy file instread of move", &copyFile,
-		"ext", "File extension", &extFilter,
 		"test", "Test mode, do not perform file operation, just print", &testMode
 		);
 	if (helpInformation.helpWanted)
