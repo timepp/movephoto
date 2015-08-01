@@ -17,7 +17,7 @@ bool infoMode;
 bool copyFile;
 bool testMode;
 bool videoMode;
-bool renameFile;
+string renameFormat = "$N";
 string dirFormat="yyyy/yyyymm";
 
 bool ContentEqual(string path1, string path2)
@@ -247,31 +247,36 @@ void ProcessSingleFile(string path)
 		return;
 	}
 
+	string base = baseName(stripExtension(path));
+	string ext = extension(path);
+
 	DateTime dt;
-	string subdir = "unsort";
+	string destDir;
 	if (GetTakenTime(path, &dt))
 	{
 		string year = to!string(dt.year);
 		string month = format("%02d", to!int(dt.month));
 		string day = format("%02d", dt.day);
-		subdir = dirFormat.replace("yyyy", year).replace("mm", month).replace("dd", day);
+		string hour = format("%02d", dt.hour);
+		string minute = format("%02d", dt.minute);
+		string second = format("%02d", dt.second);
+		string subdir = dirFormat.replace("yyyy", year).replace("mm", month).replace("dd", day);
+		destDir = buildNormalizedPath(destDirRoot, subdir);
+		base = renameFormat
+			.replace("yyyy", year).replace("mm", month).replace("dd", day)
+			.replace("HH", hour).replace("MM", minute).replace("SS", second)
+			.replace("$N", base);
 	}
-
-	string destDir = buildNormalizedPath(destDirRoot, subdir);
-	string base = baseName(stripExtension(path));
-	string ext = extension(path);
-
-	if (renameFile)
+	else
 	{
-		base = dt.date.toISOString() ~ "_" ~ dt.timeOfDay.toISOString();
+		destDir = buildNormalizedPath(destDirRoot, "unsort");
 	}
 
 	string destPath = buildNormalizedPath(destDir, base ~ ext);
-
 	// if 'destPath' already exists, we must find a new name
 	if (exists(destPath))
 	{
-		if (ContentEqual(path, destPath))
+		if (path == destPath || ContentEqual(path, destPath))
 			return;
 
 		for (int x = 2; ; x++)
@@ -309,7 +314,7 @@ void main(string[] argv)
 		"dirformat|f", "Directory format, default to 'yyyy/yyyymm'", &dirFormat,
 		"copy", "Copy file instread of move", &copyFile,
 		"video", "Process video files", &videoMode,
-		"rename", "Rename file to yyyymmdd_HHMMSS", &renameFile,
+		"rename", "Rename format, e.g. yyyymmdd_HHMMSS, default to '$N' which means to keep original name", &renameFormat,
 		"test", "Test mode, do not perform file operation, just print", &testMode
 		);
 	if (helpInformation.helpWanted)
