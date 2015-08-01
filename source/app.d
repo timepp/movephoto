@@ -22,11 +22,26 @@ string dirFormat="yyyy/yyyymm";
 
 bool ContentEqual(string path1, string path2)
 {
-	return
-		isFile(path1) && 
-		isFile(path2) &&
-		getSize(path1) == getSize(path2) &&
-		read(path1) == read(path2);
+	if (!isFile(path1) || !isFile(path2))
+		return false;
+
+	if (getSize(path1) != getSize(path2))
+		return false;
+
+	auto f1 = File(path1, "rb");
+	auto f2 = File(path2, "rb");
+	ubyte[] b1 = new ubyte[1048576];
+	ubyte[] b2 = new ubyte[1048576];
+	for (;;)
+	{
+		auto r1 = f1.rawRead(b1);
+		auto r2 = f2.rawRead(b2);
+		if (r1.length == 0 || r2.length == 0) break;
+		if (r1 != r2)
+			return false;
+	}
+
+	return true;
 }
 
 unittest
