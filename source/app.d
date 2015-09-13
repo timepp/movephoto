@@ -17,6 +17,7 @@ bool infoMode;
 bool copyFile;
 bool testMode;
 bool videoMode;
+bool processWhenTakenTimeUnknown;
 string renameFormat = "$N";
 string dirFormat="yyyy/yyyymm";
 
@@ -280,7 +281,15 @@ void ProcessSingleFile(string path)
 	}
 	else
 	{
-		destDir = buildNormalizedPath(destDirRoot, "unsort");
+		if (processWhenTakenTimeUnknown)
+		{
+			destDir = buildNormalizedPath(destDirRoot, "unsort");
+		}
+		else
+		{
+			writeln("warning: cannot find date in metadata");
+			return;
+		}
 	}
 
 	string destPath = buildNormalizedPath(destDir, base ~ ext);
@@ -326,6 +335,7 @@ void main(string[] argv)
 		"copy", "Copy file instread of move", &copyFile,
 		"video", "Process video files", &videoMode,
 		"rename", "Rename format, e.g. yyyymmdd_HHMMSS, default to '$N' which means to keep original name", &renameFormat,
+		"process_unknown", "Process file that there is no date found in metadata; these files will be put in 'unsort' folder", &processWhenTakenTimeUnknown,
 		"test", "Test mode, do not perform file operation, just print", &testMode
 		);
 	if (helpInformation.helpWanted)
