@@ -237,10 +237,21 @@ bool GetTakenTime(string path, DateTime* dt)
 	}
 }
 
+void ProcessSingleFile_NoExecption(string path)
+{
+	try
+	{
+		writeln(path);
+		ProcessSingleFile(path);
+	}
+	catch (Exception e)
+	{
+		writeln("error: ", e.msg);
+	}
+}
+
 void ProcessSingleFile(string path)
 {
-	writeln(path);
-
 	if (infoMode)
 	{
 		OutputFileInfo(path);
@@ -339,7 +350,7 @@ void main(string[] argv)
 		{
 			if (isFile(path))
 			{
-				ProcessSingleFile(path);
+				ProcessSingleFile_NoExecption(path);
 			}
 			else
 			{
@@ -348,7 +359,7 @@ void main(string[] argv)
 				{
 					if (isFile(f))
 					{
-						ProcessSingleFile(f);
+						ProcessSingleFile_NoExecption(f);
 					}
 				}
 			}
