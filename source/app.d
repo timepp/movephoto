@@ -242,7 +242,6 @@ void ProcessSingleFile_NoExecption(string path)
 {
     try
     {
-        writeln(path);
         ProcessSingleFile(path);
     }
     catch (Exception e)
@@ -258,6 +257,8 @@ void ProcessSingleFile(string path)
         OutputFileInfo(path);
         return;
     }
+
+    write("[", path, "] ");
 
     string base = baseName(stripExtension(path));
     string ext = extension(path);
@@ -293,36 +294,50 @@ void ProcessSingleFile(string path)
     }
 
     string destPath = buildNormalizedPath(destDir, base ~ ext);
+    bool processedBefore = false;
     // if 'destPath' already exists, we must find a new name
     if (exists(destPath))
     {
-        if (path == destPath || ContentEqual(path, destPath))
-            return;
-
-        for (int x = 2; ; x++)
+        if (path == destPath)
         {
-            destPath = buildNormalizedPath(destDir, format("%s %d%s", base, x, ext));
-            if (!exists(destPath))
+            writeln("src equal to dest, nothing to do.");
+            return;
+        }
+        
+        if (ContentEqual(path, destPath))
+        {
+            processedBefore = true;
+        }
+        else
+        {
+            for (int x = 2; ; x++)
             {
-                break;
+                destPath = buildNormalizedPath(destDir, format("%s %d%s", base, x, ext));
+                if (!exists(destPath))
+                {
+                    break;
+                }
             }
         }
     }
 
-    if (!testMode)
-    {
-        mkdirRecurse(destDir);
-        if (copyFile)
-        {
-            copy(path, destPath);
-        }
-        else
-        {
-            rename(path, destPath);
-        }
-    }
+    if (!testMode) mkdirRecurse(destDir);
 
-    writeln("-> ", destPath);
+    if (processedBefore)
+    {
+        if (!testMode) remove(path);
+        writeln(" processed before. deleted.");
+    }
+    else if (copyFile)
+    {
+        if (!testMode) copy(path, destPath);
+        writeln(" => [", destPath, "]");
+    }
+    else
+    {
+        if (!testMode) rename(path, destPath);
+        writeln(" -> [", destPath, "]");
+    }
 }
 
 void main(string[] argv)
@@ -346,7 +361,10 @@ void main(string[] argv)
 
     if (destDirRoot == "" && !infoMode)
     {
-        writeln("Please give destination path");
+        writeln("error: dest dir unknow.");
+        writeln("usage: movephoto [options] dir...");
+        writeln();
+        writeln("run `movephoto --help` to learn more.");
         return;
     }
 
